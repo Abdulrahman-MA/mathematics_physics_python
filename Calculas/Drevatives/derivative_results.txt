@@ -1,0 +1,9 @@
+First derivative f'(x):
+3 x^{2} - 12 x + 9
+
+Second derivative f''(x):
+6 x - 12
+
+Critical points and classification:
+Local maximum at x = 1, f''(x) = -6
+Local minimum at x = 3, f''(x) = 6
