@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from sympy.printing.pretty.pretty_symbology import line_width
 
 # Curve one
 theta = np.linspace(0, np.pi, 50)

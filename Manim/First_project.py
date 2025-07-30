@@ -206,3 +206,20 @@ class Chalenge5(Scene):
         self.play(group.animate.shift(UP * 2), run_time=1.5)
         self.play(FadeOut(group))
         self.wait(1)
+
+class SimpleEquationTransform(Scene):
+    def construct(self):
+        eq1 = MathTex("F", "=", "m", "a")
+        eq2 = MathTex("F", "=", "m", "\\cdot", "\\frac{dv}{dt}")
+
+        eq1.to_edge(UP)
+        eq2.move_to(eq1.get_center())  # align with eq1
+
+        self.play(Write(eq1), run_time=1.5)
+        self.wait(1)
+
+        self.play(
+            TransformMatchingTex(eq1, eq2),
+            run_time=2
+        )
+        self.wait(1)
