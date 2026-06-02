@@ -2,3 +2,6 @@
 /.venv
 /media
 /Manim/videos
+Manim/ParticleInBox/grid_xs.npy
+Manim/ParticleInBox/grid_ys.npy
+Manim/ParticleInBox/wavefunction_evolution.npy

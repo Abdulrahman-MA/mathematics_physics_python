@@ -1,309 +1,243 @@
 from manim import *
 import numpy as np
+import random
 
-class ElectricForce(Scene):
+class GaspresureGravityPalance(Scene):
+    """Visualizes gravitational contraction, pressure, and temperature increase."""
+
+    N_BODIES = 50
+    N_BODIES2 = 2000
+    BODY_RADIUS = 0.2
+    BODY_RADIUS2 = 0.1
+    INIT_RADIUS = 3.5
+    CENTER = np.array([0, 0, 0])
+    MOVE_TIME = 6
+
+    def RandPosition(self):
+        """Random position within a circle of INIT_RADIUS, for overlap avoidance."""
+        while True:
+            x = random.uniform(-self.INIT_RADIUS, self.INIT_RADIUS)
+            y = random.uniform(-self.INIT_RADIUS, self.INIT_RADIUS)
+            if x**2 + y**2 <= self.INIT_RADIUS**2:
+                return np.array([x, y, 0])
+
+    def color_temperature(self, frac):
+        """Interpolate color from BLUE (cold) to YELLOW (medium) to RED (hot)."""
+        if frac < 0.5:
+            return interpolate_color(BLUE, YELLOW, frac * 2)
+        else:
+            return interpolate_color(YELLOW, RED, (frac - 0.5) * 2)
+
     def construct(self):
-        radius = 0.5
-
-        # Title
-        title = Text("Electric Force", font_size=48)
-        title.to_edge(UP)  # Moves to top center of screen
-        self.play(Write(title))
-
-        # === Two main bodies ===
-        body1 = Circle(radius=radius, color=BLUE)
-        body2 = Circle(radius=radius, color=RED)
-
-        body1.move_to(LEFT * 3)
-        body2.move_to(RIGHT * 3)
-
-        label1 = Text("Body 1", font_size=24).next_to(body1, DOWN)
-        label2 = Text("Body 2", font_size=24).next_to(body2, DOWN)
-
-        plus1 = Text("+", font_size=40, weight=BOLD).move_to(body1.get_center())
-        plus2 = Text("+", font_size=40, weight=BOLD).move_to(body2.get_center())
-
-        body1_group = VGroup(body1, label1, plus1)
-        body2_group = VGroup(body2, label2, plus2)
-
-        self.play(Create(body1), Write(label1), 
-                  Create(body2), Write(label2), 
-                  Create(plus1), Create(plus2),
-                  run_time=2)
-        
-        self.wait(0.5)
-
-        # Function to create arrow from surface of one body to another
-        def surface_arrow(start_circle, target_circle, length=0.8):
-            direction = normalize(target_circle.get_center() - start_circle.get_center())
-            start = start_circle.get_center() + direction * radius
-            end = start + direction * length
-            return Arrow(start=start, end=end, color=YELLOW, stroke_width=6, buff=0)
 
 
-        self.wait(0.5)
 
-        small_scale = 0.5
-        corner_pos = UR * 2.5
+        N_LAYERS = 25
+        INIT_RADIUS = 0
+        WRAP_RADIUS = 3.5
+        DELTA_RADIUS = WRAP_RADIUS / (N_LAYERS - 1)
+        DOTS_PER_LAYER = 40
+        SCALE_FACTOR = 0.7
+        ARROW_LENGTH = 0.5
+        N_ARROWS = 24
 
-        bodies_group = VGroup(body1_group, body2_group,)
+                # --- Color Bar Legend ---
+        color_bar_width = 4
+        n_steps = 100  # number of color steps in gradient
 
+        # Create rectangles with interpolated colors
+        gradient = VGroup()
+        for i in range(n_steps):
+            frac = i / (n_steps - 1)
+            color = interpolate_color(BLUE_E, RED_E, frac)
+            rect = Rectangle(
+                width=color_bar_width / n_steps,
+                height=0.3,
+                fill_color=color,
+                fill_opacity=1,
+                stroke_width=0
+            )
+            rect.move_to(LEFT * color_bar_width / 2 + RIGHT * (i * color_bar_width / n_steps))
+            gradient.add(rect)
+
+        # Place the color bar at bottom right
+        gradient.move_to(DOWN * 3.2 + RIGHT * 4.2)
+
+        # Add text labels
+        cold_label = Text("Cold", font_size=24).next_to(gradient, LEFT, buff=0.2)
+        hot_label = Text("Hot", font_size=24).next_to(gradient, RIGHT, buff=0.2)
+
+        color_bar_group = VGroup(gradient, cold_label, hot_label).scale(0.8)
+
+        # Create star layers
+        all_dots = VGroup()
+        wrapping_circle = Dot(radius=WRAP_RADIUS, color=YELLOW_E, stroke_width=2)
+        self.play(Create(wrapping_circle))
+
+        for i in range(N_LAYERS):
+            r = INIT_RADIUS + i * DELTA_RADIUS
+            color = interpolate_color(RED_E, BLUE_E, i / N_LAYERS)
+            radius = interpolate(0.08, 0.03, i / N_LAYERS)
+
+            layer = VGroup()
+            for j in range(DOTS_PER_LAYER):
+                theta = 2 * PI * j / DOTS_PER_LAYER
+                pos = r * np.array([np.cos(theta), np.sin(theta), 0])
+                dot = Dot(point=pos, radius=radius, color=color)
+                layer.add(dot)
+            all_dots.add(layer)
+
+        self.play(FadeIn(all_dots, lag_ratio=0.1), run_time=3)
+        self.play(Write(color_bar_group))
+        # Gravity arrows
+        arrow_group = VGroup()
+        arrow_directions = []
+
+        for i in range(N_ARROWS):
+            theta = 2 * PI * i / N_ARROWS
+            direction = np.array([np.cos(theta), np.sin(theta), 0])
+            arrow_directions.append(direction)
+
+            end = WRAP_RADIUS * direction
+            start = (WRAP_RADIUS + ARROW_LENGTH) * direction
+            arrow = Arrow(start=start, end=end, stroke_width=2.5, buff=0, color=TEAL)
+            arrow_group.add(arrow)
+
+        self.play(LaggedStart(*[GrowArrow(a) for a in arrow_group], lag_ratio=0.05), run_time=2)
+
+        # Legend
+        g_arrow = Arrow(LEFT * 0.5, ORIGIN, buff=0, color=TEAL)
+        g_label = Text("Gravity", font_size=24).next_to(g_arrow, RIGHT, buff=0.2)
+        p_arrow = Arrow(LEFT * 0.5, ORIGIN, buff=0, color=RED_E)
+        p_label = Text("Pressure", font_size=24).next_to(p_arrow, RIGHT, buff=0.2)
+        legend = VGroup(VGroup(g_arrow, g_label), VGroup(p_arrow, p_label))
+        legend.arrange(DOWN, aligned_edge=LEFT, buff=0.3)
+        legend.to_corner(UL).shift(DOWN * 0.3 + RIGHT * 0.3)
+        self.play(FadeIn(legend), run_time=1)
+        self.wait()
+
+        # Contract star and gravity arrows
         self.play(
-            bodies_group.animate.scale(0.7).to_corner(UP + RIGHT),
-            title.animate.shift(LEFT*0.5),
+            all_dots.animate.scale(SCALE_FACTOR),
+            wrapping_circle.animate.scale(SCALE_FACTOR),
+            *[
+                arrow.animate.put_start_and_end_on(
+                    (WRAP_RADIUS * SCALE_FACTOR + ARROW_LENGTH) * dir,
+                    WRAP_RADIUS * SCALE_FACTOR * dir
+                )
+                for arrow, dir in zip(arrow_group, arrow_directions)
+            ],
             run_time=2
         )
-        self.wait(0.5)
-
-        # Newton's gravitational law
-        equation1 = MathTex("F = k \\frac{q_1 q_2}{r_{12}^2}", font_size=40)
-        equation1.to_corner(UP + LEFT)
-        self.play(Write(equation1), run_time=2)
-        self.wait(0.5)
-
-        # Gravitational force graph
-        axes = Axes(
-            x_range=[0.5, 10, 1],
-            y_range=[0, 5, 1],
-            x_length=6,
-            y_length=4,
-            axis_config={"include_tip": False},
-            x_axis_config={"numbers_to_include": [2, 4, 6, 8, 10]},
-            y_axis_config={"numbers_to_include": [1, 2, 3, 4, 5]},
-        )
-        axes.scale(0.8).to_corner(DOWN + LEFT)
-
-        x_label = axes.get_x_axis_label("r", edge=RIGHT, direction=RIGHT)
-        y_label = axes.get_y_axis_label("F", edge=UP)
-
-        G = 1
-        m1 = 1
-        m2 = 1
-
-        def force_func(r):
-            return G * m1 * m2 / (r ** 2)
-
-        force_graph = axes.plot(force_func, color=YELLOW)
-        
-        def get_distance():
-            return np.linalg.norm(body1.get_center() - body2.get_center())
-
-        moving_dot = always_redraw(lambda:
-            Dot(color=RED).move_to(
-                axes.c2p(
-                    get_distance(),
-                    force_func(get_distance())
-                )
-            )
-        )
-
-        force_label = always_redraw(lambda:
-            MathTex(f"F = {force_func(get_distance()):.2f}", font_size=32)
-            .next_to(moving_dot, UP)
-        )
-
-        # --- ELECTRIC POTENTIAL ENERGY ---
-
-        k = 1
-        q1 = 1
-        q2 = 1
-
-        def potential_func(r):
-            return k * q1 * q2 / r  # Positive potential (repulsive)
-
-        # Axes for potential energy vs. distance
-        potential_axes = Axes(
-            x_range=[0.5, 10, 1],
-            y_range=[0, 10, 2],
-            x_length=6,
-            y_length=4,
-            axis_config={"include_tip": False},
-            x_axis_config={"numbers_to_include": [2, 4, 6, 8, 10]},
-            y_axis_config={"numbers_to_include": [2, 4, 6, 8, 10]},
-        )
-        potential_axes.scale(1).to_corner(DOWN + RIGHT)
-
-        # Axis labels
-        x_label_U = potential_axes.get_x_axis_label("r", edge=RIGHT, direction=RIGHT)
-        y_label_U = potential_axes.get_y_axis_label("U", edge=UP)
-
-        # Plot the potential energy function
-        potential_graph = potential_axes.plot(potential_func, color=BLUE)
-
-        # Dot and label
-        potential_dot = always_redraw(lambda:
-            Dot(color=BLUE).move_to(
-                potential_axes.c2p(
-                    get_distance(),
-                    potential_func(get_distance())
-                )
-            )
-        )
-        potential_label = always_redraw(lambda:
-            MathTex(f"U = {potential_func(get_distance()):.2f}", font_size=32)
-            .next_to(potential_dot, UP)
-        )
-
-        # Show axes and graph
-        self.play(
-            Create(potential_axes), Write(x_label_U), Write(y_label_U),
-            Create(potential_graph), run_time=2
-        )
         self.wait()
 
-        # --- Barrier and tunneling visual ---
-        barrier = DashedLine(
-            start=potential_axes.c2p(0.7, 0),
-            end=potential_axes.c2p(0.7, 6),
-            color=WHITE
-        )
-        barrier_label = Text("Barrier", font_size=24).next_to(barrier, UP).shift(RIGHT * 0.5)
+        # Pressure wave and big arrows
+        final_radius = WRAP_RADIUS * SCALE_FACTOR
+        pressure_wave = Circle(radius=0.1, color=RED_E, stroke_width=4)
+        pressure_wave.set_fill(RED_E, opacity=0.4)
+        pressure_wave.move_to(ORIGIN)
 
-        tunnel_arrow = Arrow(
-            start=potential_axes.c2p(0.4, 2),
-            end=potential_axes.c2p(1.2, 2),
-            color=GREEN,
-            buff=0,
-            stroke_width=6
-        )
-        tunnel_label = Text("Tunneling", font_size=24, color=GREEN).next_to(tunnel_arrow, UP).shift(LEFT * 1)
-
-        self.play(Create(barrier), Write(barrier_label),
-                   Create(axes), Write(x_label), Write(y_label), 
-                   run_time=2)
-        self.play(GrowArrow(tunnel_arrow), Write(tunnel_label), 
-                  Create(force_graph), run_time=2)
-        
-        self.wait()
-        
-        self.add(potential_dot, potential_label)
-        self.add(moving_dot, force_label)
-
-        # Animate attraction and separation
-        def move_bodies(distance):
-            self.play(
-                body1_group.animate.shift(RIGHT * distance),
-                body2_group.animate.shift(LEFT * distance),
-                run_time=3,
-                rate_func=smooth
+        big_arrows = VGroup()
+        for dir in arrow_directions:
+            a = Arrow(
+                start=ORIGIN,
+                end=ORIGIN,
+                buff=0,
+                color=RED_E,
+                stroke_width=2.5
             )
-            self.wait(1)
-            self.play(
-                body1_group.animate.shift(LEFT * distance),
-                body2_group.animate.shift(RIGHT * distance),
-                run_time=3,
-                rate_func=smooth
-            )
-            self.wait(1)
+            big_arrows.add(a)
 
-        move_bodies(1.5)
+        self.add(pressure_wave, big_arrows)
+
+        target_arrows = VGroup()
+        for dir in arrow_directions:
+            new_arrow = Arrow(
+                start=ORIGIN,
+                end=final_radius * dir,
+                color=RED_E,
+                buff=0,
+                stroke_width=2.5
+            )
+            target_arrows.add(new_arrow)
 
         self.play(
-            *[Uncreate(element) for element in [moving_dot, force_label, force_graph, 
-                                                axes, x_label, y_label, x_label_U, 
-                                                y_label_U]]
+            AnimationGroup(
+                pressure_wave.animate.set(width=2 * final_radius).set(opacity=0),
+                *[
+                    Transform(a, new_a)
+                    for a, new_a in zip(big_arrows, target_arrows)
+                ],
+                lag_ratio=0,
+                run_time=2
+            )
         )
-        self.wait(1)
+
+
+        # Big arrows disappear tail to tip
+        self.play(
+            AnimationGroup(
+                *[
+                    a.animate.put_start_and_end_on(
+                        final_radius * dir * 0.9,
+                        final_radius * dir
+                    )
+                    for a, dir in zip(big_arrows, arrow_directions)
+                ],
+                FadeOut(pressure_wave),
+                lag_ratio=0,
+                run_time=1.5
+            )
+        )
+
+        # Expand star and replace with final small pressure arrows
+        expanded_radius = WRAP_RADIUS  # Back to original size
+        expanded_arrow_group = VGroup()
+
+        for dir in arrow_directions:
+            start = (expanded_radius - ARROW_LENGTH) * dir
+            end = expanded_radius * dir
+            new_arrow = Arrow(start=start, end=end, color=RED_E, buff=0, stroke_width=2.5)
+            expanded_arrow_group.add(new_arrow)
 
         self.play(
-            *[Uncreate(element) for element in [tunnel_label, tunnel_arrow, barrier_label, barrier]]
-        )
-
-        # Updated potential function (safe near zero)
-        def potential_func(r):
-            if abs(r) < 0.1:
-                return 10  # Avoid division near r=0
-            U = k * q1 * q2 / r
-            return abs(U)  # Ensure potential is always positive
-
-        # New extended axes for potential
-        potential_axes_extended = Axes(
-            x_range=[-10, 10, 2],
-            y_range=[0, 10, 2],
-            x_length=10,
-            y_length=5,
-            axis_config={"include_tip": False},
-            x_axis_config={"numbers_to_include": [-10, -5, 0, 5, 10]},
-            y_axis_config={"numbers_to_include": [0, 5, 10]},
-        ).scale(0.9).to_edge(DOWN)
-
-        x_label_ext = potential_axes_extended.get_x_axis_label("r", edge=RIGHT, direction=RIGHT)
-        y_label_ext = potential_axes_extended.get_y_axis_label("U", edge=UP)
-
-        new_potential_graph = potential_axes_extended.plot(potential_func, color=BLUE)
-
-        # After new axes and graph are displayed:
-        # Remove old dots
-        self.remove(potential_dot, potential_label, moving_dot, force_label)
-
-        # Redefine dot logic for new axes
-        new_moving_dot = always_redraw(lambda:
-            Dot(color=RED).move_to(
-                potential_axes_extended.c2p(
-                    get_distance(),
-                    potential_func(get_distance())
+            all_dots.animate.scale(1 / SCALE_FACTOR),
+            wrapping_circle.animate.scale(1 / SCALE_FACTOR),
+            *[
+                Transform(arrow, new_arrow)
+                for arrow, new_arrow in zip(big_arrows, expanded_arrow_group)
+            ],
+            *[
+                arrow.animate.put_start_and_end_on(
+                    (expanded_radius + ARROW_LENGTH) * dir,
+                    expanded_radius * dir
                 )
-            )
-        )
-
-        new_moving_dot2 = always_redraw(lambda:
-            Dot(color=BLUE).move_to(
-                potential_axes_extended.c2p(
-                    -get_distance(),                 
-                    potential_func(-get_distance())
-                )
-            )
-        )
-
-        new_force_label = always_redraw(lambda:
-            MathTex(f"U_{{\\text{{RED}}}} = {potential_func(get_distance()):.2f}", font_size=32)
-            .next_to(new_moving_dot, UP)
-        )
-        new_force_label2 = always_redraw(lambda:
-            MathTex(f"U_{{\\text{{BLUE}}}} = -{potential_func(get_distance()):.2f}", font_size=32)
-            .next_to(new_moving_dot2, UP)
-        )
-
-        self.add(new_moving_dot, new_force_label, new_moving_dot2, new_force_label2)
-
-        # Transition from old to new graph
-        self.play(
-            Transform(potential_axes, potential_axes_extended),
-            Transform(potential_graph, new_potential_graph),
-            FadeIn(x_label_ext),
-            FadeIn(y_label_ext),
+                for arrow, dir in zip(arrow_group, arrow_directions)
+            ],
             run_time=2
         )
-        self.wait(1)
 
-        
+        # Now final small pressure arrows (fade in over existing ones)
+        final_pressure_arrows = VGroup()
+        for dir in arrow_directions:
+            start = (expanded_radius - ARROW_LENGTH) * dir
+            end = expanded_radius * dir
+            arrow = Arrow(start=start, end=end, color=RED_E, buff=0, stroke_width=2.5)
+            final_pressure_arrows.add(arrow)
+
+        self.play(
+            FadeOut(big_arrows),
+            FadeIn(final_pressure_arrows),
+            run_time=1.5
+        )
+        # Fade out all elements
+        self.play(
+            FadeOut(all_dots),
+            FadeOut(wrapping_circle),
+            FadeOut(arrow_group),
+            FadeOut(color_bar_group),
+            FadeOut(legend),
+            FadeOut(final_pressure_arrows),
+            run_time=1.5
+        )
         self.wait()
-
-        def wiggle_bodies(n):
-            for i in range(n):
-                self.play(body2_group.animate.shift(LEFT * 3.4),
-                        run_time=0.1)
-                self.play(body2_group.animate.shift(RIGHT * 3.4),
-                        run_time=0.1)
-                i+= 1
-        wiggle_bodies(10)
-
-        self.play(body2_group.animate.shift(LEFT * 3.4),
-                        run_time=0.1)
-        
-        bodyies_group = VGroup(body1_group, body2_group)
-
-        last_circle = Circle(radius=radius+0.3, color=YELLOW)
-        last_label = Text("Body 3", font_size=24).next_to(last_circle, DOWN)
-        last_sign = Text("2+", font_size=40, weight=BOLD).move_to(last_circle.get_center())
-        last_group = VGroup(last_circle, last_label, last_sign)
-        last_group.scale(0.7).next_to(body1_group, RIGHT, buff=0)
-
-        self.play(Transform(bodyies_group, last_group),
-                  run_time=1)
-
-        self.wait(1)
-
-        self.play(FadeOut(*self.mobjects))
-
-        self.wait(1)
